@@ -10,7 +10,7 @@ A Saga is a sequence of local transactions. Each local transaction updates the d
 
 If a local transaction fails (for example, due to a business rule violation like insufficient funds), the saga executes a series of **compensating transactions** to undo the changes made by the preceding local transactions.
 
-## Real-Life Example: Booking a Vacation ✈️🏨🚗
+## Real-Life Example: Booking a Vacation
 
 Imagine you are booking a complete vacation package online that includes:
 1. Reserving a flight.
