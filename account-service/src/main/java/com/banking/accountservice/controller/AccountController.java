@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.banking.accountservice.dto.AccountReponse;
 import com.banking.accountservice.dto.CreateAccountRequest;
 import com.banking.accountservice.entity.Account;
-import com.banking.accountservice.mapper.AccountMapper;
 import com.banking.accountservice.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -28,19 +27,16 @@ import java.math.BigDecimal;
 public class AccountController {
 
     private final AccountService accountService;
-    private final AccountMapper accountMapper;
 
     @PostMapping
     public ResponseEntity<AccountReponse> createAccount(@Valid @RequestBody CreateAccountRequest request) {
         log.info("Received request to create account for email: {}", request.getEmail());
-        Account account = accountService.createAccount(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(accountMapper.mapToResponse(account));
+        return ResponseEntity.status(HttpStatus.CREATED).body(accountService.createAccount(request));
     }
 
     @GetMapping("/{accountNumber}")
     public ResponseEntity<AccountReponse> getAccount(@PathVariable String accountNumber) {
-        Account account = accountService.getAccountByAccountNumber(accountNumber);
-        return ResponseEntity.ok(accountMapper.mapToResponse(account));
+        return ResponseEntity.ok(accountService.getAccount(accountNumber));
     }
 
     @GetMapping("/{accountNumber}/balance")
@@ -54,14 +50,28 @@ public class AccountController {
         accountService.blockAccount(accountNumber);
         return ResponseEntity.ok().build();
     }
+
     /*
      * saga step 1 - deduct balance
+     * called by transection service when create transection
      */
-
     @PostMapping("/{accountNumber}/deduct")
-    public ResponseEntity<Void> deductBalance(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
+    public ResponseEntity<String> deductBalance(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
         log.info("Received request to deduct {} from account with account number: {}", amount, accountNumber);
         accountService.deductBalance(accountNumber, amount);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok("balance deducted successfully");
+    }
+
+    /*
+     * saga step 4 - compensation transection endpoint
+     * called by transection service in two scenerios
+     * 1. fraud detect -> refund sender (undo step 1 )
+     * 2. transection completed - credit recieved
+     */
+    @PostMapping("/{accountNumber}/credit")
+    public ResponseEntity<String> creditBalance(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
+        log.info("Received request to refund {} to account with account number: {}", amount, accountNumber);
+        accountService.creditBalance(accountNumber, amount);
+        return ResponseEntity.ok("balance credited successfully");
     }
 }
