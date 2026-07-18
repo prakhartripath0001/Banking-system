@@ -54,6 +54,9 @@ public class AccountController {
         accountService.blockAccount(accountNumber);
         return ResponseEntity.ok().build();
     }
+    /*
+     * saga step 1 - deduct balance
+     */
 
     @PostMapping("/{accountNumber}/deduct")
     public ResponseEntity<Void> deductBalance(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
