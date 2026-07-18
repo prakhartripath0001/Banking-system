@@ -86,6 +86,11 @@ public class AccountService {
         return account.getBalance();
     }
 
+    /*
+     * Block account - called by fraud detection service via kafka
+     * 
+     * @param accountNumber
+     */
     @Transactional
     public void blockAccount(String accountNumber) {
         log.info("Blocking account with account number: {}", accountNumber);
@@ -98,6 +103,14 @@ public class AccountService {
         accountRepository.save(account);
     }
 
+    /*
+     * Deduct balance from sender account
+     * called by transectional service
+     * 
+     * @param accountNumber
+     * 
+     * @param amount
+     */
     @Transactional
     public void deductBalance(String accountNumber, BigDecimal amount) {
         log.info("Deducting {} from account with account number: {}", amount, accountNumber);
@@ -118,6 +131,14 @@ public class AccountService {
         accountRepository.save(account);
     }
 
+    /*
+     * Credit balance
+     * called by transectional service via kafka
+     * 
+     * @param accountNumber
+     * 
+     * @param amount
+     */
     @Transactional
     public void creditBalance(String accountNumber, BigDecimal amount) {
         log.info("Crediting {} to account with account number: {}", amount, accountNumber);
