@@ -52,6 +52,13 @@ public class AccountService {
         return accountMapper.mapToResponse(accountRepository.save(account));
     }
 
+    /**
+     * Fetch account details by account number.
+     * Throws an exception if the account is not found.
+     * 
+     * @param accountNumber the unique account number
+     * @return AccountReponse DTO containing the account details
+     */
     public AccountReponse getAccountByAccountNumber(String accountNumber) {
         log.info("Fetching account with account number: {}", accountNumber);
         Account account = accountRepository.findByAccountNumber(accountNumber)
@@ -62,6 +69,13 @@ public class AccountService {
         return accountMapper.mapToResponse(account);
     }
 
+    /**
+     * Fetch the current balance of the specified account.
+     * Throws an exception if the account is not found.
+     * 
+     * @param accountNumber the unique account number
+     * @return BigDecimal representing the current account balance
+     */
     public BigDecimal getBalance(String accountNumber) {
         log.info("Fetching balance for account number: {}", accountNumber);
         Account account = accountRepository.findByAccountNumber(accountNumber)
