@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.banking.accountservice.dto.AccountReponse;
 import com.banking.accountservice.dto.CreateAccountRequest;
-import com.banking.accountservice.entity.Account;
 import com.banking.accountservice.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -36,7 +35,7 @@ public class AccountController {
 
     @GetMapping("/{accountNumber}")
     public ResponseEntity<AccountReponse> getAccount(@PathVariable String accountNumber) {
-        return ResponseEntity.ok(accountService.getAccount(accountNumber));
+        return ResponseEntity.ok(accountService.getAccountByAccountNumber(accountNumber));
     }
 
     @GetMapping("/{accountNumber}/balance")

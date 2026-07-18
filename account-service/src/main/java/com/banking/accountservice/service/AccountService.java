@@ -3,6 +3,7 @@ package com.banking.accountservice.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.util.UUID;
 import com.banking.accountservice.entity.Account;
 import com.banking.accountservice.entity.enums.AccountStatus;
@@ -21,6 +22,7 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final AccountMapper accountMapper;
+    private static SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
     public AccountReponse createAccount(CreateAccountRequest request) {
@@ -50,28 +52,34 @@ public class AccountService {
         return accountMapper.mapToResponse(accountRepository.save(account));
     }
 
-    public AccountReponse getAccount(String accountNumber) {
+    public AccountReponse getAccountByAccountNumber(String accountNumber) {
         log.info("Fetching account with account number: {}", accountNumber);
-        return accountMapper.mapToResponse(getAccountByAccountNumber(accountNumber));
-    }
-
-    public Account getAccountByAccountNumber(String accountNumber) {
-        log.info("Fetching account with account number: {}", accountNumber);
-        return accountRepository.findByAccountNumber(accountNumber)
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> {
                     log.error("Account not found with account number: {}", accountNumber);
                     return new RuntimeException("Account not found with account number: " + accountNumber);
                 });
+        return accountMapper.mapToResponse(account);
     }
 
     public BigDecimal getBalance(String accountNumber) {
-        return getAccountByAccountNumber(accountNumber).getBalance();
+        log.info("Fetching balance for account number: {}", accountNumber);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> {
+                    log.error("Account not found with account number: {}", accountNumber);
+                    return new RuntimeException("Account not found with account number: " + accountNumber);
+                });
+        return account.getBalance();
     }
 
     @Transactional
     public void blockAccount(String accountNumber) {
         log.info("Blocking account with account number: {}", accountNumber);
-        Account account = getAccountByAccountNumber(accountNumber);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> {
+                    log.error("Account not found with account number: {}", accountNumber);
+                    return new RuntimeException("Account not found with account number: " + accountNumber);
+                });
         account.setAccountStatus(AccountStatus.BLOCKED);
         accountRepository.save(account);
     }
@@ -79,7 +87,11 @@ public class AccountService {
     @Transactional
     public void deductBalance(String accountNumber, BigDecimal amount) {
         log.info("Deducting {} from account with account number: {}", amount, accountNumber);
-        Account account = getAccountByAccountNumber(accountNumber);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> {
+                    log.error("Account not found with account number: {}", accountNumber);
+                    return new RuntimeException("Account not found with account number: " + accountNumber);
+                });
         if (account.getAccountStatus() != AccountStatus.ACTIVE) {
             log.error("Cannot deduct balance: Account {} is not active", accountNumber);
             throw new RuntimeException("Account is not active");
@@ -95,7 +107,11 @@ public class AccountService {
     @Transactional
     public void creditBalance(String accountNumber, BigDecimal amount) {
         log.info("Crediting {} to account with account number: {}", amount, accountNumber);
-        Account account = getAccountByAccountNumber(accountNumber);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> {
+                    log.error("Account not found with account number: {}", accountNumber);
+                    return new RuntimeException("Account not found with account number: " + accountNumber);
+                });
         if (account.getAccountStatus() != AccountStatus.ACTIVE) {
             log.error("Cannot credit balance: Account {} is not active", accountNumber);
             throw new RuntimeException("Account is not active");
@@ -105,6 +121,13 @@ public class AccountService {
     }
 
     private String generateAccountNumber() {
-        return String.valueOf((long) (Math.random() * 1_000_000_000_000L));
+        String accountNumber;
+
+        do {
+            long randomLong = secureRandom.nextLong(1_000_000_000_000L);
+            accountNumber = String.format("%012d", randomLong);
+        } while (accountRepository.existsByAccountNumber(accountNumber));
+
+        return accountNumber;
     }
 }
