@@ -36,37 +36,37 @@ public class AccountService {
         return accountRepository.save(account);
     }
 
-    public Account getAccount(String id) {
-        log.info("Fetching account with id: {}", id);
-        return accountRepository.findById(id)
+    public Account getAccountByAccountNumber(String accountNumber) {
+        log.info("Fetching account with account number: {}", accountNumber);
+        return accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> {
-                    log.error("Account not found with id: {}", id);
-                    return new RuntimeException("Account not found with id: " + id);
+                    log.error("Account not found with account number: {}", accountNumber);
+                    return new RuntimeException("Account not found with account number: " + accountNumber);
                 });
     }
 
-    public BigDecimal getBalance(String id) {
-        return getAccount(id).getBalance();
+    public BigDecimal getBalance(String accountNumber) {
+        return getAccountByAccountNumber(accountNumber).getBalance();
     }
 
     @Transactional
-    public void blockAccount(String id) {
-        log.info("Blocking account with id: {}", id);
-        Account account = getAccount(id);
+    public void blockAccount(String accountNumber) {
+        log.info("Blocking account with account number: {}", accountNumber);
+        Account account = getAccountByAccountNumber(accountNumber);
         account.setAccountStatus(AccountStatus.BLOCKED);
         accountRepository.save(account);
     }
 
     @Transactional
-    public void deductBalance(String id, BigDecimal amount) {
-        log.info("Deducting {} from account with id: {}", amount, id);
-        Account account = getAccount(id);
+    public void deductBalance(String accountNumber, BigDecimal amount) {
+        log.info("Deducting {} from account with account number: {}", amount, accountNumber);
+        Account account = getAccountByAccountNumber(accountNumber);
         if (account.getAccountStatus() != AccountStatus.ACTIVE) {
-            log.error("Cannot deduct balance: Account {} is not active", id);
+            log.error("Cannot deduct balance: Account {} is not active", accountNumber);
             throw new RuntimeException("Account is not active");
         }
         if (account.getBalance().compareTo(amount) < 0) {
-            log.error("Cannot deduct balance: Insufficient balance for account {}", id);
+            log.error("Cannot deduct balance: Insufficient balance for account {}", accountNumber);
             throw new RuntimeException("Insufficient balance");
         }
         account.setBalance(account.getBalance().subtract(amount));
