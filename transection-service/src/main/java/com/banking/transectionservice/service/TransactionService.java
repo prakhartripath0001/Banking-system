@@ -49,4 +49,33 @@ public class TransactionService {
                 
         return transactionMapper.mapToResponse(transaction);
     }
+
+    public java.util.List<TransactionResponse> getTransactionHistory(String accountNumber) {
+        log.info("Fetching transaction history for account: {}", accountNumber);
+        
+        return transactionRepository.findBySenderAccountNumberOrRecieverAccountNumber(accountNumber, accountNumber)
+                .stream()
+                .map(transactionMapper::mapToResponse)
+                .toList();
+    }
+
+    public TransactionResponse verifyOTP(String transactionId, String otp) {
+        log.info("Verifying OTP for transaction ID: {}", transactionId);
+        
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Transaction not found with ID: " + transactionId));
+                
+        if ("123456".equals(otp)) {
+            transaction.setStatus(TransactionStatus.COMPLETED);
+            transactionRepository.save(transaction);
+            log.info("OTP verified successfully for transaction ID: {}", transactionId);
+        } else {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transaction.setFailureReason("Invalid OTP");
+            transactionRepository.save(transaction);
+            throw new RuntimeException("Invalid OTP for transaction ID: " + transactionId);
+        }
+        
+        return transactionMapper.mapToResponse(transaction);
+    }
 }
