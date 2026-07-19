@@ -12,6 +12,8 @@ import com.banking.transectionservice.entity.enums.TransactionStatus;
 import com.banking.transectionservice.entity.enums.TransactionType;
 import com.banking.transectionservice.mapper.TransactionMapper;
 import com.banking.transectionservice.repository.TransactionRepository;
+import com.banking.transectionservice.event.TransactionIntiatedEvent;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountServiceClient accountServiceClient;
     private final TransactionMapper transactionMapper;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String TRANSACTION_INITIATED_TOPIC = "transaction:initiated";
     private static final String TRANSACTION_COMPLETED_TOPIC = "transaction:completed";
@@ -64,6 +67,17 @@ public class TransactionService {
         Transaction savedTransaction = transactionRepository.save(transaction);
         log.info("Transaction saved as PROCESSING", savedTransaction.getId());
 
+        TransactionIntiatedEvent event = new TransactionIntiatedEvent(
+                savedTransaction.getId(),
+                savedTransaction.getSenderAccountNumber(),
+                savedTransaction.getRecieverAccountNumber(),
+                savedTransaction.getAmount(),
+                savedTransaction.getDescription());
+
+        // 3. Publishes a "transaction initiated" event to Kafka to trigger a fraud
+        // check.
+        kafkaTemplate.send(TRANSACTION_INITIATED_TOPIC, event);
+
         return transactionMapper.mapToResponse(savedTransaction);
     }
 
@@ -99,6 +113,11 @@ public class TransactionService {
             transaction.setStatus(TransactionStatus.FAILED);
             transaction.setFailureReason("Invalid OTP");
             transactionRepository.save(transaction);
+
+            // SAGA step 4: Refund the sender if OTP fails
+            log.info("Invalid OTP, refunding balance for transaction ID: {}", transactionId);
+            accountServiceClient.refundBalance(transaction.getSenderAccountNumber(), transaction.getAmount());
+
             throw new RuntimeException("Invalid OTP for transaction ID: " + transactionId);
         }
 
