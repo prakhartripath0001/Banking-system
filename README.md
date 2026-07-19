@@ -19,3 +19,34 @@ The system utilizes several architectural patterns common in modern distributed 
 ## License
 
 If you copy or use this code in any way, you must provide clear credit and attribution to the original author.
+
+## How to Run Locally
+
+### Prerequisites
+- [Docker](https://www.docker.com/) and Docker Compose installed.
+- Java 17+ installed.
+
+### 1. Start Infrastructure (Docker)
+This project relies on several backing services (MySQL, Redis, Kafka, Zookeeper) which are pre-configured in `docker-compose.yml`.
+
+Run the following command in the root directory to start all required infrastructure:
+```bash
+docker-compose up -d
+```
+You can verify the containers are running with `docker ps`.
+
+### 2. Run the Microservices
+Each microservice is a standard Spring Boot application. To run them locally, navigate into the respective service directory (e.g., `account-service`, `transection-service`) and use the Maven wrapper:
+
+```bash
+cd account-service
+./mvnw spring-boot:run
+```
+
+Open a new terminal for each service you wish to run. Ensure the Docker infrastructure is fully running before starting the services, as they will attempt to connect to MySQL and Kafka on startup.
+
+### 3. Stop Infrastructure
+When you are done developing, you can stop the background containers by running:
+```bash
+docker-compose down
+```

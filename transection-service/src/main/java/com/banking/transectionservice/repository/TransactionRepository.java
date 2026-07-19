@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.banking.transectionservice.entity.Transaction;
 
-public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+public interface TransactionRepository extends JpaRepository<Transaction, String> {
     Optional<Transaction> findByReferenceNumber(String referenceNumber);
 
 }
