@@ -19,40 +19,45 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class TransactionService {
-    
+
     private final TransactionRepository transactionRepository;
     private final TransactionMapper transactionMapper;
 
+    private static final String TRANSACTION_INITIATED_TOPIC = "transaction:initiated";
+    private static final String TRANSACTION_COMPLETED_TOPIC = "transaction:completed";
+    private static final String TRANSACTION_REFUNDED_TOPIC = "transaction:refunded";
+
     public TransactionResponse transfer(TransferRequest request) {
-        log.info("Processing transfer from {} to {}", request.getSenderAccountNumber(), request.getRecieverAccountNumber());
-        
+        log.info("Processing transfer from {} to {}", request.getSenderAccountNumber(),
+                request.getRecieverAccountNumber());
+
         Transaction transaction = new Transaction();
         transaction.setSenderAccountNumber(request.getSenderAccountNumber());
         transaction.setRecieverAccountNumber(request.getRecieverAccountNumber());
         transaction.setAmount(request.getAmount());
         transaction.setDescription(request.getDescription());
-        
+
         transaction.setType(TransactionType.TRANSFER);
         transaction.setStatus(TransactionStatus.PENDING);
         transaction.setReferenceNumber(UUID.randomUUID().toString());
-        
+
         Transaction savedTransaction = transactionRepository.save(transaction);
-        
+
         return transactionMapper.mapToResponse(savedTransaction);
     }
 
     public TransactionResponse getTransaction(String transactionId) {
         log.info("Fetching transaction with ID: {}", transactionId);
-        
+
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found with ID: " + transactionId));
-                
+
         return transactionMapper.mapToResponse(transaction);
     }
 
     public java.util.List<TransactionResponse> getTransactionHistory(String accountNumber) {
         log.info("Fetching transaction history for account: {}", accountNumber);
-        
+
         return transactionRepository.findBySenderAccountNumberOrRecieverAccountNumber(accountNumber, accountNumber)
                 .stream()
                 .map(transactionMapper::mapToResponse)
@@ -61,10 +66,10 @@ public class TransactionService {
 
     public TransactionResponse verifyOTP(String transactionId, String otp) {
         log.info("Verifying OTP for transaction ID: {}", transactionId);
-        
+
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found with ID: " + transactionId));
-                
+
         if ("123456".equals(otp)) {
             transaction.setStatus(TransactionStatus.COMPLETED);
             transactionRepository.save(transaction);
@@ -75,7 +80,7 @@ public class TransactionService {
             transactionRepository.save(transaction);
             throw new RuntimeException("Invalid OTP for transaction ID: " + transactionId);
         }
-        
+
         return transactionMapper.mapToResponse(transaction);
     }
 }
