@@ -1,6 +1,6 @@
 package com.banking.transectionservice.service;
 
-import java.util.UUID;
+import java.util.*;
 
 import org.springframework.stereotype.Service;
 
@@ -76,7 +76,8 @@ public class TransactionService {
 
         // 3. Publishes a "transaction initiated" event to Kafka to trigger a fraud
         // check.
-        kafkaTemplate.send(TRANSACTION_INITIATED_TOPIC, event);
+        kafkaTemplate.send(TRANSACTION_INITIATED_TOPIC, savedTransaction.getId(), event);
+        log.info("Transaction initiated event sent to Kafka with ID: {}", savedTransaction.getId());
 
         return transactionMapper.mapToResponse(savedTransaction);
     }
@@ -90,13 +91,16 @@ public class TransactionService {
         return transactionMapper.mapToResponse(transaction);
     }
 
-    public java.util.List<TransactionResponse> getTransactionHistory(String accountNumber) {
+    public List<TransactionResponse> getTransactionHistory(String accountNumber) {
         log.info("Fetching transaction history for account: {}", accountNumber);
 
-        return transactionRepository.findBySenderAccountNumberOrRecieverAccountNumber(accountNumber, accountNumber)
-                .stream()
-                .map(transactionMapper::mapToResponse)
-                .toList();
+        List<Transaction> transactions = transactionRepository
+                .findBySenderAccountNumberOrRecieverAccountNumber(accountNumber, accountNumber);
+        List<TransactionResponse> responseList = new ArrayList<>();
+        for (Transaction transaction : transactions) {
+            responseList.add(transactionMapper.mapToResponse(transaction));
+        }
+        return responseList;
     }
 
     public TransactionResponse verifyOTP(String transactionId, String otp) {

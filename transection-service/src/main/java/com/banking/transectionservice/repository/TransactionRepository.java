@@ -9,6 +9,7 @@ import com.banking.transectionservice.entity.Transaction;
 
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
     Optional<Transaction> findByReferenceNumber(String referenceNumber);
-    
-    List<Transaction> findBySenderAccountNumberOrRecieverAccountNumber(String senderAccountNumber, String recieverAccountNumber);
+
+    List<Transaction> findBySenderAccountNumberOrRecieverAccountNumber(String senderAccountNumber,
+            String recieverAccountNumber);
 }
