@@ -1,5 +1,6 @@
 package com.banking.frauddetectionservice.service;
 
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import com.banking.frauddetectionservice.client.AccountServiceClient;
@@ -7,6 +8,8 @@ import com.banking.frauddetectionservice.model.FraudCheckResult;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.HashMap;
 import java.util.Map;
 import java.math.BigDecimal;
 
@@ -16,6 +19,9 @@ import java.math.BigDecimal;
 public class FraudDetectionService {
 
     private final AccountServiceClient accountServiceClient;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
+    private static final String FRAUD_CHECK_CLEAN_RESULT = "fraud.check.clean.result";
 
     public void checkTransaction(Map<String, String> payload) {
         String transactionId = (String) payload.get("transactionId");
@@ -44,8 +50,23 @@ public class FraudDetectionService {
         if (result.isFraud()) {
             log.info("suspicious activity detected - account: {}" + "reason: {} - requesting OTP verification ",
                     accountNumber, result.getReason());
+
+            Map<String, Object> verificationEvent = new HashMap<>();
+            verificationEvent.put("transactionId", transactionId);
+            verificationEvent.put("accountNumber", accountNumber);
+            verificationEvent.put("amount", amount);
+            verificationEvent.put("reason", result.getReason());
+
+            kafkaTemplate.send(VERIFICATION_REQUIRED_TOPIC, transactionId, verificationEvent);
         } else {
             log.info("Transaction {} passed fraud check", transactionId);
+
+            Map<String, Object> transactionCleanEvent = new HashMap<>();
+            transactionCleanEvent.put("transactionId", transactionId);
+            transactionCleanEvent.put("isFraud", false);
+            transactionCleanEvent.put("reasong", null);
+
+            kafkaTemplate.send(FRAUD_CHECK_CLEAN_RESULT, transactionId, transactionCleanEvent);
         }
     }
 
