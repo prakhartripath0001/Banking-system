@@ -70,4 +70,16 @@ public class FraudDetectionService {
         }
     }
 
+    private FraudCheckResult performFraudChecks(String accountNumber, BigDecimal amount, BigDecimal senderBalance) {
+        if (isVelocityExceeded(accountNumber)) {
+            return new FraudCheckResult(true, "too many transaction in 60 seconds" + "velcoity limit exceeded");
+        }
+
+        if (isAmountSuspicious(accountNumber, amount)) {
+            return new FraudCheckResult(true, "Amount more than 50000, OTP is required");
+        }
+
+        return new FraudCheckResult(false, null);
+    }
+
 }
