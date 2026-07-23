@@ -1,5 +1,8 @@
 package com.banking.frauddetectionservice.service;
 
+import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.detDSA;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -9,13 +12,17 @@ import com.banking.frauddetectionservice.model.FraudCheckResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -24,11 +31,19 @@ public class FraudDetectionService {
 
     private final AccountServiceClient accountServiceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
+
+    @Value("${fraud.max-transaction-per-minute}")
+    private int maxTransactionPerMinute;
+    @Value("${fraud. }")
+    private double suspiciousAmountMultiplier;
+
     private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
     private static final String FRAUD_CHECK_CLEAN_RESULT = "fraud.check.clean.result";
 
     // Velocity check: tracks timestamps of recent transactions per account
-    private static final int VELOCITY_LIMIT = 5;
+    @Value("${fraud.max-transaction-per-minute}")
+    private int velocityLimit;
     private static final long VELOCITY_WINDOW_SECONDS = 60;
     private final Map<String, List<Instant>> transactionTimestamps = new ConcurrentHashMap<>();
 
@@ -109,25 +124,17 @@ public class FraudDetectionService {
      * @return true if the velocity limit has been exceeded
      */
     private boolean isVelocityExceeded(String accountNumber) {
-        Instant now = Instant.now();
-        Instant windowStart = now.minusSeconds(VELOCITY_WINDOW_SECONDS);
+        String key = "fraud:velocity" + accountNumber;
+        Long count = redisTemplate.opsForValue().increment(key);
 
-        // Get or create the list of recent transaction timestamps for this account
-        List<Instant> timestamps = transactionTimestamps
-                .computeIfAbsent(accountNumber, k -> new ArrayList<>());
-
-        // Remove timestamps that are outside the rolling window
-        timestamps.removeIf(t -> t.isBefore(windowStart));
-
-        // Record the current transaction timestamp
-        timestamps.add(now);
-
-        boolean exceeded = timestamps.size() > VELOCITY_LIMIT;
-        if (exceeded) {
-            log.warn("Velocity check FAILED for account {}: {} transactions in last {} seconds",
-                    accountNumber, timestamps.size(), VELOCITY_WINDOW_SECONDS);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, 60, TimeUnit.SECONDS);
         }
-        return exceeded;
+
+        log.info("velocity check - account : {} count: {}/{}",
+                accountNumber, count, maxTransactionPerMinute);
+
+        return count != null && count > maxTransactionPerMinute;
     }
 
     /**
@@ -137,13 +144,27 @@ public class FraudDetectionService {
      * @param amount the transaction amount
      * @return true if the amount is suspicious
      */
-    private boolean isAmountSuspicious(BigDecimal amount) {
-        boolean suspicious = amount.compareTo(SUSPICIOUS_AMOUNT_THRESHOLD) > 0;
-        if (suspicious) {
-            log.warn("Amount check FAILED: transaction amount {} exceeds threshold {}",
-                    amount, SUSPICIOUS_AMOUNT_THRESHOLD);
+    private boolean isAmountSuspicious(String accountNumber,  BigDecimal amount) {
+        String avgKey = "fraud:avg_amount:" + accountNumber;
+        String avgStr = redisTemplate.opsForValue().get(avgKey);
+
+        if(avgStr == null) {
+            redisTemplate.opsForValue().set(avgKey, amount.toString()); 
+            return false;
         }
-        return suspicious;
+
+        BigDecimal newAvg = new BigDecimal(avgStr);
+        BigDecimal threshold = avgAmount.multiply(BigDecimal.valueOf(suspiciousAmountMultiplier));
+
+        BigDecimal newAvg = avgAmount.add(amount).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP)
+
+        if (amount.compareTo(threshold) > 0) {
+            redisTemplate.opsForValue().set(avgKey, amount.toString());
+            return true;
+        }
+
+        redisTemplate.opsForValue().set(avgKey, amount.toString(), 60, TimeUnit.SECONDS);
+        return false;
     }
 
     /**
@@ -162,7 +183,8 @@ public class FraudDetectionService {
         boolean failed = drainRatio.compareTo(BALANCE_DRAIN_THRESHOLD) > 0;
         if (failed) {
             log.warn("Balance check FAILED: transaction amount {} is {}% of balance {}",
-                    amount, drainRatio.multiply(BigDecimal.valueOf(100)).setScale(2, java.math.RoundingMode.HALF_UP), senderBalance);
+                    amount, drainRatio.multiply(BigDecimal.valueOf(100)).setScale(2, java.math.RoundingMode.HALF_UP),
+                    senderBalance);
         }
         return failed;
     }
