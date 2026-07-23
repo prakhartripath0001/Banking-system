@@ -35,8 +35,10 @@ public class FraudDetectionService {
 
     @Value("${fraud.max-transaction-per-minute}")
     private int maxTransactionPerMinute;
-    @Value("${fraud. }")
+    @Value("${fraud.avg-amount-multiplier}")
     private double suspiciousAmountMultiplier;
+    @Value("${fraud.max-balance-percentage}")
+    private double maxBalancePercentage;
 
     private static final String VERIFICATION_REQUIRED_TOPIC = "verification.required";
     private static final String FRAUD_CHECK_CLEAN_RESULT = "fraud.check.clean.result";
@@ -158,13 +160,16 @@ public class FraudDetectionService {
 
         BigDecimal newAvg = avgAmount.add(amount).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP)
 
+        redisTemplate.opsForValue().set(avgKey, newAvg.toString(), 60);
+
+        log.info("amount check - amount : {}  threshold: {} supicious: {}", 
+                amount, threshold, amount.compareTo(threshold));   
+
         if (amount.compareTo(threshold) > 0) {
             redisTemplate.opsForValue().set(avgKey, amount.toString());
             return true;
         }
-
-        redisTemplate.opsForValue().set(avgKey, amount.toString(), 60, TimeUnit.SECONDS);
-        return false;
+        return amount.compareTo(threshold) > 0;
     }
 
     /**
@@ -176,6 +181,7 @@ public class FraudDetectionService {
      * @return true if the transaction drains more than 90% of the balance
      */
     private boolean isBalanceCheckFailed(BigDecimal senderBalance, BigDecimal amount) {
+        BigDecimal maxAllowed = 
         if (senderBalance.compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
