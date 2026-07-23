@@ -181,17 +181,12 @@ public class FraudDetectionService {
      * @return true if the transaction drains more than 90% of the balance
      */
     private boolean isBalanceCheckFailed(BigDecimal senderBalance, BigDecimal amount) {
-        BigDecimal maxAllowed = 
-        if (senderBalance.compareTo(BigDecimal.ZERO) <= 0) {
-            return false;
-        }
-        BigDecimal drainRatio = amount.divide(senderBalance, 4, java.math.RoundingMode.HALF_UP);
-        boolean failed = drainRatio.compareTo(BALANCE_DRAIN_THRESHOLD) > 0;
-        if (failed) {
-            log.warn("Balance check FAILED: transaction amount {} is {}% of balance {}",
-                    amount, drainRatio.multiply(BigDecimal.valueOf(100)).setScale(2, java.math.RoundingMode.HALF_UP),
-                    senderBalance);
-        }
-        return failed;
+        BigDecimal maxAllowed = senderBalance.multiply(
+                BigDecimal.valueOf(maxBalancePercentage));
+
+        log.info("balance check - maxAllowed : {} suscpecious : {}", amount, maxAllowed,
+                amount.compareTo(maxAllowed) > 0);
+
+        return amount.compareTo(maxAllowed) > 0;
     }
 }
